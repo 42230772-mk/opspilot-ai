@@ -1,0 +1,335 @@
+{
+  "name": "OpsPilot AI - Daily Briefing",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *\nFROM leads\nWHERE status NOT IN ('won', 'lost')\nORDER BY \n  CASE interest_level\n    WHEN 'high' THEN 1\n    WHEN 'medium' THEN 2\n    WHEN 'low' THEN 3\n  END,\n  next_followup_date ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        176,
+        0
+      ],
+      "id": "bdbcdf68-77fe-4ce9-8d70-e6d2feeb5721",
+      "name": "MySQL Leads",
+      "credentials": {
+        "mySql": {
+          "id": "XbKTxrTDmeqrgsdn",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *\nFROM tasks\nWHERE status != 'completed'\nORDER BY\n  CASE priority\n    WHEN 'high' THEN 1\n    WHEN 'medium' THEN 2\n    WHEN 'low' THEN 3\n  END,\n  due_date ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        176,
+        144
+      ],
+      "id": "5bfa7b5b-370d-4767-9c6b-5527da3c4976",
+      "name": "MySQL Tasks",
+      "credentials": {
+        "mySql": {
+          "id": "XbKTxrTDmeqrgsdn",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        384,
+        64
+      ],
+      "id": "090fd77b-ab3c-4876-97f9-087ab3271f8b",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "sendTo": "mkkhalife304@gmail.com",
+        "subject": "OpsPilot AI - Daily Briefing",
+        "message": "={{$json.briefing}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1408,
+        64
+      ],
+      "id": "bd832440-14ee-4647-97c9-ba574769a6db",
+      "name": "Send a message",
+      "webhookId": "59c1bc42-c3f9-44a2-a1ad-1a8d9c62ba2c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "T77XPFTR0Lyn7YQ8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst prompt = `\nHere is my operations data:\n\nLEADS:\n${JSON.stringify(data.leads, null, 2)}\n\nTASKS:\n${JSON.stringify(data.tasks, null, 2)}\n\nGenerate a daily briefing with:\n1. Short summary of today's situation\n2. Top 3 priorities\n3. Leads requiring follow-up with reasons\n4. Suggested follow-up messages\n\nKeep it clear, practical, and actionable.\n`;\n\nreturn [\n  {\n    json: {\n      body: {\n        model: \"llama-3.3-70b-versatile\",\n        messages: [\n          {\n            role: \"system\",\n            content: \"You are an AI operations manager for a freelancer. Be concise, practical, and action-oriented.\"\n          },\n          {\n            role: \"user\",\n            content: prompt\n          }\n        ],\n        temperature: 0.4\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        64
+      ],
+      "id": "248f52b5-f293-4dd5-9685-86da5b971bcf",
+      "name": "Groq code node"
+    },
+    {
+      "parameters": {
+        "jsCode": "const leads = [];\nconst tasks = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  if (data.name && data.company) {\n    leads.push({\n      id: data.id,\n      name: data.name,\n      company: data.company,\n      email: data.email,\n      status: data.status,\n      interest_level: data.interest_level,\n      last_contact_date: data.last_contact_date,\n      next_followup_date: data.next_followup_date,\n      notes: data.notes,\n    });\n  }\n\n  if (data.title && data.due_date) {\n    tasks.push({\n      id: data.id,\n      title: data.title,\n      category: data.category,\n      priority: data.priority,\n      status: data.status,\n      due_date: data.due_date,\n      notes: data.notes,\n    });\n  }\n}\n\nreturn [\n  {\n    json: {\n      generated_at: new Date().toISOString(),\n      leads,\n      tasks,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        64
+      ],
+      "id": "67c9dfdc-db0d-49c7-9d25-c18814989c05",
+      "name": "clean code node"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json.body}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1008,
+        64
+      ],
+      "id": "7e73a5db-f9d7-4397-a6bb-120a04ddc1aa",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nconst briefing = response.choices[0].message.content;\n\nreturn [\n  {\n    json: {\n      briefing,\n      generated_at: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        64
+      ],
+      "id": "4cbfb858-4d76-40e3-aaea-a2784c547a06",
+      "name": "Code in JavaScript (briefing node)"
+    },
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "briefing_logs",
+          "mode": "list",
+          "cachedResultName": "briefing_logs"
+        },
+        "dataMode": "defineBelow",
+        "valuesToSend": {
+          "values": [
+            {
+              "column": "briefing_date",
+              "value": "={{$json.generated_at}}"
+            },
+            {
+              "column": "summary",
+              "value": "={{ $json.briefing }}"
+            },
+            {
+              "column": "email_sent_to",
+              "value": "mkkhalife304@gmail.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1408,
+        224
+      ],
+      "id": "a389a28b-a78c-40ad-a4f3-f68d8c3bec4e",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "mySql": {
+          "id": "XbKTxrTDmeqrgsdn",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fd06d966-ddef-49be-b315-e761ea79e325",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "MySQL Leads": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MySQL Tasks": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "clean code node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq code node": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean code node": {
+      "main": [
+        [
+          {
+            "node": "Groq code node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript (briefing node)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript (briefing node)": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table": {
+      "main": [
+        []
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "MySQL Tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MySQL Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6cdef033-9906-4000-9876-36779517f30f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4592ce34d667c22ab69102c1277f41c06db04da4e82ee0b4cc074775784780c7"
+  },
+  "id": "evqFFA8oWZJzR3Gp",
+  "tags": []
+}
