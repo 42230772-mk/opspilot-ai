@@ -162,6 +162,21 @@ Designing scalable AI workflows
 Optimizing LLM usage for cost and performance
 
 
+---
+
+## 🔐 Security & Configuration
+
+Sensitive values such as database credentials, API keys, and webhook URLs are managed using environment variables.
+
+The project includes:
+
+- `.env` for local private configuration
+- `.env.example` as a safe template
+- `.gitignore` to prevent secrets and Python cache files from being committed
+
+This keeps the project secure while still making it easy for others to understand what configuration is required.
+
+
 🔮 Future Improvements
 React dashboard for UI
 Lead scoring system
